@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Creative Suite: Photo & Video Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'brand-primary': '#4f46e5',
+              'brand-secondary': '#7c3aed',
+              'brand-light': '#a5b4fc',
+              'base-100': '#1f2937',
+              'base-200': '#374151',
+              'base-300': '#4b5563',
+              'content': '#d1d5db',
+            },
+            animation: {
+              'shimmer': 'shimmer 2s linear infinite',
+              'fade-in': 'fade-in 0.5s ease-out forwards',
+            },
+            keyframes: {
+              shimmer: {
+                '0%': { background-position: '-1000px 0' },
+                '100%': { background-position: '1000px 0' },
+              },
+              'fade-in': {
+                '0%': { opacity: 0, transform: 'translateY(10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      .shimmer-bg {
+        background-color: #374151;
+        background-image: linear-gradient(
+          to right,
+          #374151 0%,
+          #4b5563 20%,
+          #374151 40%,
+          #374151 100%
+        );
+        background-repeat: no-repeat;
+        background-size: 1000px 100%;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-base-100 text-content">
+    <div id="root"></div>
+  </body>
+</html>
