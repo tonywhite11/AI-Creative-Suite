@@ -4,16 +4,19 @@ import PhotoEditor from './components/PhotoEditor';
 import VideoGenerator from './components/VideoGenerator';
 import ImageGenerator from './components/ImageGenerator';
 import MusicGenerator from './components/MusicGenerator';
+import SoundDesigner from './components/SoundDesigner';
 import Tabs from './components/ui/Tabs';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.Image);
   const [exportedImage, setExportedImage] = useState<UploadedImage | null>(null);
+  const [exportedMusicPrompt, setExportedMusicPrompt] = useState<string | null>(null);
 
   const tabs = [
     { id: AppTab.Image, label: 'AI Image Generator' },
     { id: AppTab.Photo, label: 'AI Photo Editor' },
     { id: AppTab.Video, label: 'AI Video Generator' },
+    { id: AppTab.Sound, label: 'AI Sound Designer' },
     { id: AppTab.Music, label: 'AI Music Generator' },
   ];
 
@@ -22,8 +25,17 @@ const App: React.FC = () => {
     setActiveTab(targetTab);
   };
 
+  const handleExportMusicPrompt = (prompt: string, targetTab: AppTab) => {
+    setExportedMusicPrompt(prompt);
+    setActiveTab(targetTab);
+  };
+
   const clearExportedImage = () => {
     setExportedImage(null);
+  };
+
+  const clearExportedMusicPrompt = () => {
+    setExportedMusicPrompt(null);
   };
 
   return (
@@ -47,8 +59,11 @@ const App: React.FC = () => {
           <div className={activeTab === AppTab.Video ? '' : 'hidden'}>
             <VideoGenerator exportedImage={exportedImage} onExportConsumed={clearExportedImage} />
           </div>
+          <div className={activeTab === AppTab.Sound ? '' : 'hidden'}>
+            <SoundDesigner onExport={handleExportMusicPrompt} />
+          </div>
           <div className={activeTab === AppTab.Music ? '' : 'hidden'}>
-            <MusicGenerator />
+            <MusicGenerator exportedMusicPrompt={exportedMusicPrompt} onExportConsumed={clearExportedMusicPrompt} />
           </div>
         </div>
       </main>

@@ -1,5 +1,5 @@
 // FIX: Removed `VideosOperationResponse` as it is not an exported member of '@google/genai'.
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { UploadedImage } from "../types";
 
 if (!process.env.API_KEY) {
@@ -23,7 +23,8 @@ export const editImage = async (images: UploadedImage[], prompt: string): Promis
         }));
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image-preview',
+            // FIX: Updated model name to 'gemini-2.5-flash-image' as per coding guidelines.
+            model: 'gemini-2.5-flash-image',
             contents: {
                 parts: [
                     ...imageParts,
@@ -55,30 +56,39 @@ export const editImage = async (images: UploadedImage[], prompt: string): Promis
 
     } catch (error) {
         console.error("Error editing image:", error);
-        throw new Error("Failed to edit image. Please check the console for more details.");
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to edit image. The prompt may have been blocked or another error occurred.");
     }
 };
 
-export const generateVideo = async (base64ImageData: string, mimeType: string, prompt: string, durationInSeconds: number, model: string): Promise<string> => {
+export const generateVideo = async (prompt: string, model: string, image?: UploadedImage): Promise<string> => {
     try {
-        let operation = await ai.models.generateVideos({
+        const payload: {
+            model: string;
+            prompt: string;
+            image?: { imageBytes: string; mimeType: string; };
+            config: { numberOfVideos: number; };
+        } = {
             model: model,
             prompt: prompt,
-            image: {
-                imageBytes: base64ImageData,
-                mimeType: mimeType,
-            },
             config: {
                 numberOfVideos: 1,
-                // FIX: Corrected property name from `durationInSeconds` to `durationSeconds` to match the API.
-                durationSeconds: durationInSeconds,
             }
-        });
+        };
+
+        if (image) {
+            payload.image = {
+                imageBytes: image.base64,
+                mimeType: image.mimeType,
+            };
+        }
+
+        let operation = await ai.models.generateVideos(payload);
 
         while (!operation.done) {
             await new Promise(resolve => setTimeout(resolve, 10000));
-            // FIX: Removed the cast to `VideosOperationResponse` because it's not an exported type.
-            // The `operation` object is correctly typed through inference.
             operation = await ai.operations.getVideosOperation({ operation: operation });
         }
 
@@ -97,7 +107,10 @@ export const generateVideo = async (base64ImageData: string, mimeType: string, p
 
     } catch (error) {
         console.error("Error generating video:", error);
-        throw new Error("Failed to generate video. Please check the console for more details.");
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to generate video. The prompt may have been blocked or another error occurred.");
     }
 };
 
@@ -122,7 +135,10 @@ export const generateImages = async (prompt: string, aspectRatio: string): Promi
 
     } catch (error) {
         console.error("Error generating image:", error);
-        throw new Error("Failed to generate image. Please check the console for more details.");
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to generate image. The prompt may have been blocked or another error occurred.");
     }
 };
 
@@ -157,7 +173,10 @@ export const enhancePrompt = async (currentPrompt?: string): Promise<string> => 
 
     } catch (error) {
         console.error("Error enhancing prompt:", error);
-        throw new Error("Failed to enhance prompt. Please check the console for details.");
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to enhance prompt. The prompt may have been blocked or another error occurred.");
     }
 };
 
@@ -192,6 +211,121 @@ export const enhanceMusicPrompt = async (currentPrompt?: string): Promise<string
 
     } catch (error) {
         console.error("Error enhancing music prompt:", error);
-        throw new Error("Failed to enhance music prompt. Please check the console for details.");
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to enhance music prompt. The prompt may have been blocked or another error occurred.");
+    }
+};
+
+export interface VideoAnalysisResult {
+    sceneDescription: string;
+    musicPrompt: string;
+}
+
+export const analyzeVideoForSound = async (frames: string[]): Promise<VideoAnalysisResult> => {
+    try {
+        const imageParts = frames.map(base64Data => ({
+            inlineData: {
+                data: base64Data,
+                mimeType: 'image/jpeg',
+            },
+        }));
+
+        const prompt = `
+            Analyze the following sequence of video frames.
+            1.  **Describe the Scene**: Briefly describe the environment, objects, and any actions taking place.
+            2.  **Suggest a Soundtrack**: Based on the scene, create a detailed prompt for an AI music generator. The prompt should describe the ideal soundscape, including ambient noises, sound effects, and background music. Specify the mood, genre, instrumentation, and tempo.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [
+                    ...imageParts,
+                    { text: prompt },
+                ],
+            },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        sceneDescription: {
+                            type: Type.STRING,
+                            description: "A description of the scene, objects, and actions in the video frames."
+                        },
+                        musicPrompt: {
+                            type: Type.STRING,
+                            description: "A detailed prompt for an AI music generator, including genre, mood, instruments, and sound effects."
+                        }
+                    },
+                    required: ["sceneDescription", "musicPrompt"]
+                }
+            }
+        });
+
+        const jsonStr = response.text.trim();
+        const result = JSON.parse(jsonStr);
+        
+        if (!result.sceneDescription || !result.musicPrompt) {
+            throw new Error("The model did not return the expected analysis structure.");
+        }
+
+        return result;
+
+    } catch (error) {
+        console.error("Error analyzing video for sound:", error);
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to analyze video. The prompt may have been blocked or another error occurred.");
+    }
+};
+
+export const suggestDialogue = async (frames: string[]): Promise<string> => {
+    try {
+        const imageParts = frames.map(base64Data => ({
+            inlineData: {
+                data: base64Data,
+                mimeType: 'image/jpeg',
+            },
+        }));
+
+        const prompt = `
+            Analyze the following sequence of video frames and suggest some brief, creative dialogue that could fit the scene.
+            - If there are characters, write a short exchange between them.
+            - If there is one character, write a short monologue or thought.
+            - If there are no characters, suggest some appropriate voice-over narration.
+            Return only the suggested dialogue or narration as a single block of text, without any preamble, formatting, or conversational text. For example, if two characters are speaking, just write the lines:
+            "Character 1: [line]"
+            "Character 2: [line]"
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [
+                    ...imageParts,
+                    { text: prompt },
+                ],
+            },
+            config: {
+                temperature: 0.8,
+            },
+        });
+
+        const dialogue = response.text.trim();
+        if (!dialogue) {
+            throw new Error("The model did not return any dialogue suggestions.");
+        }
+        return dialogue;
+
+    } catch (error) {
+        console.error("Error suggesting dialogue:", error);
+        if (error instanceof Error && (error.message.includes('RESOURCE_EXHAUSTED') || error.message.includes('429'))) {
+            throw new Error("API quota exceeded. Please check your API key usage and limits.");
+        }
+        throw new Error("Failed to suggest dialogue. The prompt may have been blocked or another error occurred.");
     }
 };

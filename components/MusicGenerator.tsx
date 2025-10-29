@@ -133,8 +133,12 @@ const loadingMessages = [
 type VisualizerType = 'combined' | 'bars' | 'wave';
 type ColorScheme = 'default' | 'sunset' | 'ocean' | 'mono';
 
+interface MusicGeneratorProps {
+    exportedMusicPrompt?: string | null;
+    onExportConsumed?: () => void;
+}
 
-const MusicGenerator: React.FC = () => {
+const MusicGenerator: React.FC<MusicGeneratorProps> = ({ exportedMusicPrompt, onExportConsumed }) => {
     const [prompt, setPrompt] = useState(genres[0].prompt);
     const [bpm, setBpm] = useState(genres[0].bpm);
     const [temperature, setTemperature] = useState(genres[0].temperature);
@@ -167,6 +171,15 @@ const MusicGenerator: React.FC = () => {
 
     const isGenerating = status === 'generating';
     const isBusy = isGenerating || isEnhancingPrompt;
+    
+    useEffect(() => {
+        if (exportedMusicPrompt && onExportConsumed) {
+            setPrompt(exportedMusicPrompt);
+            onExportConsumed();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [exportedMusicPrompt, onExportConsumed]);
+
 
     const handleGenreSelect = (genre: GenrePreset) => {
         setPrompt(genre.prompt);
@@ -325,12 +338,11 @@ const MusicGenerator: React.FC = () => {
                 weightedPrompts: [{ text: prompt, weight: 1.0 }],
             });
 
+            // FIX: Removed `sampleRateHz` as it does not exist in type 'LiveMusicGenerationConfig'.
             await session.setMusicGenerationConfig({
                 musicGenerationConfig: {
                     bpm: bpm,
                     temperature: temperature,
-                    audioFormat: "pcm16",
-                    sampleRateHz: 44100,
                 },
             });
 

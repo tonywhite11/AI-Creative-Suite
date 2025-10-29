@@ -24,9 +24,9 @@ const videoStyles = [
     { value: 'slow-motion', label: 'Slow Motion' },
 ];
 
+// FIX: Removed experimental video model 'veo-3.0-generate-001' to adhere to supported models list.
 const videoModels = [
     { value: 'veo-2.0-generate-001', label: 'Veo 2' },
-    { value: 'veo-3.0-generate-001', label: 'Veo 3 (Experimental)' },
 ];
 
 interface VideoGeneratorProps {
@@ -36,14 +36,14 @@ interface VideoGeneratorProps {
 
 const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, onExportConsumed }) => {
     const [sourceImages, setSourceImages] = useState<(UploadedImage | null)[]>([null, null, null]);
-    const [prompt, setPrompt] = useState<string>('Animate this image with a gentle breeze blowing.');
+    const [prompt, setPrompt] = useState<string>('An epic cinematic shot of a volcano erupting, with lava flowing down its sides.');
     const [videoStyle, setVideoStyle] = useState<string>('cinematic');
     const [videoModel, setVideoModel] = useState<string>(videoModels[0].value);
-    const [videoDuration, setVideoDuration] = useState<number>(5);
     const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [loadingMessage, setLoadingMessage] = useState<string>(loadingMessages[0]);
+    const [useImageInput, setUseImageInput] = useState<boolean>(true);
     const intervalRef = useRef<number | null>(null);
 
     useEffect(() => {
@@ -94,6 +94,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, o
             const indexToUpdate = firstEmptyIndex !== -1 ? firstEmptyIndex : 0;
             
             handleImageUpload(exportedImage, indexToUpdate);
+            setUseImageInput(true); // Ensure image input is enabled when exporting
             onExportConsumed();
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -101,24 +102,27 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, o
 
 
     const handleGenerate = async () => {
-        const firstImage = sourceImages.find(img => img !== null);
-
-        if (!firstImage || !prompt) {
-            setError("Please upload at least one image and provide a prompt.");
+        if (!prompt) {
+            setError("Please provide a prompt to generate a video.");
             return;
         }
+        
+        const firstImage = sourceImages.find(img => img !== null);
+        const imageToUse = useImageInput && firstImage ? firstImage : undefined;
+
 
         setIsLoading(true);
         setError(null);
         setGeneratedVideoUrl(null);
         setLoadingMessage(loadingMessages[0]);
 
+        // FIX: Rewrote the try/catch/finally block to resolve phantom parsing errors.
         try {
             const finalPrompt = `${prompt}, in a ${videoStyle} style.`;
-            const url = await generateVideo(firstImage.base64, firstImage.mimeType, finalPrompt, videoDuration, videoModel);
+            const url = await generateVideo(finalPrompt, videoModel, imageToUse);
             setGeneratedVideoUrl(url);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'An unknown error occurred.');
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : 'An unknown error occurred.');
         } finally {
             setIsLoading(false);
         }
@@ -138,7 +142,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, o
         link.click();
         document.body.removeChild(link);
     };
-    
+
     const hasUploadedImage = sourceImages.some(img => img !== null);
 
     return (
@@ -146,7 +150,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, o
             <Card>
                 <div className="space-y-6">
                     <div>
-                        <h3 className="text-xl font-semibold mb-3">1. Upload Source Images (up to 3)</h3>
+                        <h3 className="text-xl font-semibold mb-3">1. Add Images (Optional)</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                              {[0, 1, 2].map(index => (
                                 <ImageUpload 
@@ -157,7 +161,22 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, o
                                 />
                             ))}
                         </div>
-                        <p className="text-xs text-gray-500 mt-2 text-center">Note: The first uploaded image will be the primary subject for the video generation.</p>
+                        <p className="text-xs text-gray-500 mt-2 text-center">The first uploaded image will be used to guide generation if enabled below.</p>
+                        <div className="mt-4 flex justify-center">
+                            <label className="flex items-center space-x-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={useImageInput}
+                                    onChange={(e) => setUseImageInput(e.target.checked)}
+                                    className="h-5 w-5 text-brand-primary bg-base-300 border-gray-600 rounded focus:ring-brand-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                    disabled={!hasUploadedImage || isLoading}
+                                    aria-label="Use uploaded image to guide generation"
+                                />
+                                <span className={`text-content ${!hasUploadedImage ? 'text-gray-500' : ''}`}>
+                                    Use image to guide generation
+                                </span>
+                            </label>
+                        </div>
                     </div>
                     <div>
                         <h3 className="text-xl font-semibold mb-3">2. Describe the Video & Choose a Style</h3>
@@ -192,24 +211,7 @@ const VideoGenerator: React.FC<VideoGeneratorProps> = ({ exportedImage = null, o
                                 ))}
                             </select>
                         </div>
-                        <div className="mt-4">
-                            <label htmlFor="video-duration" className="block text-sm font-medium text-gray-300 mb-2">
-                                Video Duration: <span className="font-bold text-brand-light">{videoDuration}s</span>
-                            </label>
-                            <input
-                                id="video-duration"
-                                type="range"
-                                min="3"
-                                max="8"
-                                step="1"
-                                value={videoDuration}
-                                onChange={(e) => setVideoDuration(Number(e.target.value))}
-                                className="w-full h-2 bg-base-300 rounded-lg appearance-none cursor-pointer accent-brand-primary"
-                                disabled={isLoading}
-                                aria-label="Select video duration"
-                            />
-                        </div>
-                        <Button onClick={handleGenerate} disabled={!hasUploadedImage || isLoading || !prompt} className="mt-6 w-full">
+                        <Button onClick={handleGenerate} disabled={isLoading || !prompt} className="mt-6 w-full">
                             {isLoading ? <Spinner /> : '🎬 Generate Video'}
                         </Button>
                     </div>

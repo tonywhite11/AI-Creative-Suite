@@ -1,5 +1,5 @@
 {
-  "name": "AI Creative Suite: Photo, Video & Image Generation",
-  "description": "An AI-powered application to effortlessly edit photos, generate stunning videos, and create incredible images from text prompts.",
+  "name": "AI Creative Suite: Photo, Video, Image & Music Generation",
+  "description": "An AI-powered application to effortlessly edit photos, generate stunning videos, create incredible images, and design custom soundtracks from video analysis.",
   "requestFramePermissions": []
 }

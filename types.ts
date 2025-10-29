@@ -3,6 +3,7 @@ export enum AppTab {
   Photo = 'photo',
   Video = 'video',
   Music = 'music',
+  Sound = 'sound',
 }
 
 export interface UploadedImage {
